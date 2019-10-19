@@ -2,6 +2,7 @@ package me.chuwy.kharms.common
 
 import java.util.Base64
 
+import cats.data.Validated
 import cats.implicits._
 import com.monovore.decline._
 import scodec.bits.ByteVector
@@ -9,16 +10,22 @@ import scodec.bits.ByteVector
 
 object Config {
 
-  private val Base64Encoder = Base64.getEncoder
-
   val DefaultServerHost = "localhost"
   val DefaultServerPort = 8000
 
+  val DefaultMax = 5
+
+  // Common
   val host: Opts[String] = Opts.option[String]("host", short = "h", metavar = "str", help = "Hostname to bind").withDefault(DefaultServerHost)
   val port: Opts[Int] = Opts.option[Int]("port", short = "p", metavar = "int", help = "Port to bind").withDefault(DefaultServerPort)
 
+  // Push
   val data: Opts[String] = Opts.option[String]("data", short = "d", metavar = "base64", help = "Base64-encoded")
   val raw: Opts[Boolean] = Opts.flag("raw", "Pass raw bytes instead of string").orFalse
+
+  // Pull
+  val ack: Opts[Boolean] = Opts.flag("ack", "Ack all received messages").orFalse
+  val max: Opts[Int] = Opts.option[Int]("max", "Maximum items to receive").withDefault(DefaultMax)
 
   case class ServerConf(host: String, port: Int)
   val serverConf: Opts[ServerConf] = (host, port).mapN(ServerConf.apply)
@@ -27,12 +34,16 @@ object Config {
   sealed trait Action extends Product with Serializable
   object Action {
     case class Push(data: ByteVector) extends Action
-    case object Pull extends Action
+    case class Pull(max: Int, ack: Boolean) extends Action
 
-    val opts = Opts.subcommand[Action]("push", "Push data to a stream") { (data, raw).mapN {
-      case (s, true) => Push(ByteVector(Base64.getDecoder.decode(s)))
-      case (s, false) => Push(ByteVector(s.getBytes))
-    } } orElse(Opts.subcommand[Action]("pull", "Pull data from a stream")(Opts(Pull)))
+    val pushOpts = Opts.subcommand[Push]("push", "Push data to a stream") { (data, raw).mapN {
+      case (s, true) => Validated.catchOnly[IllegalArgumentException](Base64.getDecoder.decode(s)).leftMap(_.getMessage)
+      case (s, false) => s.getBytes.valid[String]
+    }.mapValidated(_.map(bytes => Push(ByteVector(bytes))).toValidatedNel)}
+
+    val pullOpts = Opts.subcommand[Pull]("pull", "Pull data from a stream") { (max, ack).mapN(Pull.apply) }
+
+    val opts = pushOpts.orElse(pullOpts)
   }
 
   case class ClientConf(command: Action, serverHost: String, serverPort: Int)

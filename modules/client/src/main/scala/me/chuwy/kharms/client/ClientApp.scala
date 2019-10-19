@@ -24,8 +24,8 @@ object ClientApp extends IOApp {
             result <- config.command match {
               case Config.Action.Push(data) =>
                 Actions.push(connection, data).map(x => Actions.interpret(x))
-              case Config.Action.Pull =>
-                Actions.pull(connection).map(x => Actions.interpret(x))
+              case Config.Action.Pull(max, ack) =>
+                Actions.pull(connection, max, ack).map(x => Actions.interpret(x))
             }
             (success, message) = result
             _ <- IO.delay(println(message))
