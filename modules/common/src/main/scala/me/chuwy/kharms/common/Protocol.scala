@@ -7,15 +7,24 @@ import org.http4s.{EntityDecoder, EntityEncoder}
 import org.http4s.circe.{ jsonOf, jsonEncoderOf }
 
 object Protocol {
-  case class Response(message: String)
+  /** Successful push response */
+  case class MessageReceived(message: String)
 
-  implicit val circeResponseDecoder: Decoder[Response] = deriveDecoder[Response]
+  implicit val circeMessageReceivedDecoder: Decoder[MessageReceived] = deriveDecoder[MessageReceived]
+  implicit val circeMessageReceivedEncoder: Encoder[MessageReceived] = deriveEncoder[MessageReceived]
+  implicit def http4sMessageReceivedDecoder[F[_]: Sync]: EntityDecoder[F, MessageReceived] =
+    jsonOf[F, MessageReceived]
+  implicit def http4sMessageReceivedEncoder[F[_]: Sync]: EntityEncoder[F, MessageReceived] =
+    jsonEncoderOf[F, MessageReceived]
 
-  implicit val circeResponseEncoder: Encoder[Response] = deriveEncoder[Response]
+  /** Pull response */
+  case class RecordsResponse(records: List[Array[Byte]])
 
-  implicit def http4sResponseDecoder[F[_]: Sync]: EntityDecoder[F, Response] =
-    jsonOf[F, Response]
+  implicit val circeRecordsResponseDecoder: Decoder[RecordsResponse] = deriveDecoder[RecordsResponse]
+  implicit val circeRecordsResponseEncoder: Encoder[RecordsResponse] = deriveEncoder[RecordsResponse]
+  implicit def http4sRecordsResponseDecoder[F[_]: Sync]: EntityDecoder[F, RecordsResponse] =
+    jsonOf[F, RecordsResponse]
+  implicit def http4sRecordsResponseEncoder[F[_]: Sync]: EntityEncoder[F, RecordsResponse] =
+    jsonEncoderOf[F, RecordsResponse]
 
-  implicit def http4sResponseEncoder[F[_]: Sync]: EntityEncoder[F, Response] =
-    jsonEncoderOf[F, Response]
 }

@@ -12,7 +12,7 @@ import org.http4s.syntax.kleisli._
 import org.http4s.circe._
 import io.circe.syntax._
 import me.chuwy.kharms.common.Config.ServerConf
-import me.chuwy.kharms.common.Protocol.{ Response => KResponse }
+import me.chuwy.kharms.common.Protocol.{ MessageReceived => KResponse, RecordsResponse }
 
 object ServerHttpEndpoint {
 
@@ -36,11 +36,8 @@ object ServerHttpEndpoint {
       } yield response
     case GET -> Root / "pull" =>
       for {
-        data     <- state.fifo.modify {
-          case Nil => (Nil, Array[Byte]())
-          case a :: tail => (tail, a)
-        }
-        response <- Ok(KResponse(new String(data)).asJson)
+        data <- state.fifo.modify { existing => (Nil, RecordsResponse(existing)) }
+        response <- Ok(data.asJson)
       } yield response
   }.orNotFound
 }

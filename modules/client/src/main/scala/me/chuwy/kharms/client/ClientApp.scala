@@ -21,13 +21,13 @@ object ClientApp extends IOApp {
         BlazeClientBuilder[IO](global).resource.use { client =>
           val connection = Actions.Connection(client, config.serverHost, config.serverPort)
           for {
-            response <- config.command match {
+            result <- config.command match {
               case Config.Action.Push(data) =>
-                Actions.push(connection, data)
+                Actions.push(connection, data).map(x => Actions.interpret(x))
               case Config.Action.Pull =>
-                Actions.pull(connection)
+                Actions.pull(connection).map(x => Actions.interpret(x))
             }
-            (success, message) = Actions.interpret(response)
+            (success, message) = result
             _ <- IO.delay(println(message))
           } yield if (success) ExitCode.Success else ExitCode.Error
         }
