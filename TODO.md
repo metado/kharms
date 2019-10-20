@@ -1,8 +1,8 @@
 # TODO
 
-* [ ] LIFO -> FIFO
+* [x] LIFO -> FIFO
 * [ ] Topics
-* [ ] Async pull
 * [ ] Persistence
+* [ ] Async pull
 
 
