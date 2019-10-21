@@ -1,6 +1,7 @@
 package me.chuwy.kharms.server
 
 import java.time.Instant
+import java.nio.file.{ Path, Files }
 
 import scala.collection.immutable.Queue
 
@@ -27,8 +28,10 @@ object ServerHttpEndpoint {
 
   case class Records[F[_]](fifo: Ref[F, State])
 
-  def initialize[F[_]: Sync]: F[Records[F]] =
+  def initializeState[F[_]: Sync](storage: Path): F[Records[F]] = {
+    Sync[F].delay(Files.isDirectory(storage))
     Ref.of[F, State](init).map(Records.apply)
+  }
 
   def buildServer(state: Records[IO], conf: ServerConf)(implicit CS: ContextShift[IO], T: Timer[IO]) =
     BlazeServerBuilder[IO].bindHttp(conf.port, conf.host).withHttpApp(clientRegistryRoutes(state))

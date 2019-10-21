@@ -1,10 +1,13 @@
 package me.chuwy.kharms.common
 
 import java.util.Base64
+import java.nio.file.Path
 
 import cats.data.Validated
 import cats.implicits._
+
 import com.monovore.decline._
+
 import scodec.bits.ByteVector
 
 
@@ -19,6 +22,9 @@ object Config {
   val host: Opts[String] = Opts.option[String]("host", short = "h", metavar = "str", help = "Hostname to bind").withDefault(DefaultServerHost)
   val port: Opts[Int] = Opts.option[Int]("port", short = "p", metavar = "int", help = "Port to bind").withDefault(DefaultServerPort)
 
+  // Server
+  val storage: Opts[Path] = Opts.option[Path]("storage", short = "d", metavar = "str", help = "Path to persistent storage")
+
   // Push
   val data: Opts[String] = Opts.option[String]("data", short = "d", metavar = "base64", help = "Base64-encoded")
   val raw: Opts[Boolean] = Opts.flag("raw", "Pass raw bytes instead of string").orFalse
@@ -27,8 +33,8 @@ object Config {
   val ack: Opts[Boolean] = Opts.flag("ack", "Ack all received messages").orFalse
   val max: Opts[Int] = Opts.option[Int]("max", "Maximum items to receive").withDefault(DefaultMax)
 
-  case class ServerConf(host: String, port: Int)
-  val serverConf: Opts[ServerConf] = (host, port).mapN(ServerConf.apply)
+  case class ServerConf(host: String, port: Int, storage: Path)
+  val serverConf: Opts[ServerConf] = (host, port, storage).mapN(ServerConf.apply)
 
 
   sealed trait Action extends Product with Serializable

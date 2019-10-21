@@ -15,7 +15,7 @@ object ServerApp extends IOApp {
     command.parse(args) match {
       case Right(config) =>
         for {
-          registry <- ServerHttpEndpoint.initialize[IO]
+          registry <- ServerHttpEndpoint.initializeState[IO]
           _        <- ServerHttpEndpoint.buildServer(registry, config).serve.compile.drain
         } yield ExitCode.Success
       case Left(error) =>
