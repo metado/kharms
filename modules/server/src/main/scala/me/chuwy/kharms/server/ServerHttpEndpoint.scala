@@ -5,11 +5,13 @@ import java.nio.file.{ Path, Files }
 
 import scala.collection.immutable.Queue
 
+import fs2.concurrent.{ Queue => StreamQueue }
+
 import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.implicits._
 
-import org.http4s.{HttpApp, HttpRoutes, QueryParamDecoder}
+import org.http4s.{HttpApp, HttpRoutes}
 import org.http4s.dsl.io._
 import org.http4s.server.blaze._
 import org.http4s.syntax.kleisli._
@@ -26,11 +28,17 @@ object ServerHttpEndpoint {
 
   val init = State(Queue.empty, 0L)
 
-  case class Records[F[_]](fifo: Ref[F, State])
+  case class Records[F[_]](fifo: Ref[F, State], sink: StreamQueue[F, Message])
 
-  def initializeState[F[_]: Sync](storage: Path): F[Records[F]] = {
-    Sync[F].delay(Files.isDirectory(storage))
-    Ref.of[F, State](init).map(Records.apply)
+  def initializeState[F[_]: ContextShift: Concurrent](storage: Path, blocker: Blocker): F[Records[F]] = {
+    for {
+      dir     <- Sync[F].delay(Files.isDirectory(storage))
+      _       <- if (dir) Sync[F].unit else Sync[F].raiseError[Unit](new RuntimeException(s"Storage path $storage is not a directory"))
+      queue   <- StreamQueue.unbounded[F, Message]
+      sink     = Storage.write[F](storage, blocker)
+      fiber   <- Concurrent[F].start(queue.dequeue.through(sink).compile.drain)
+      records <- Ref.of[F, State](init).map(ref => Records(ref, queue))
+    } yield records
   }
 
   def buildServer(state: Records[IO], conf: ServerConf)(implicit CS: ContextShift[IO], T: Timer[IO]) =
@@ -56,6 +64,8 @@ object ServerHttpEndpoint {
       for {
         payload  <- req.as[Array[Byte]]
         meta     <- addPayload(state, payload)
+        message   = Message(meta, payload)
+        _        <- state.sink.enqueue1(message)
         response <- Ok(meta.asJson)
       } yield response
     case GET -> Root / "pull" :? Max(max) :? Ack(ack) =>
